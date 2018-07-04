@@ -45,6 +45,7 @@ public class Engine implements Runnable {
     
     public String schema = "";
     public String query = "";
+    public byte command = 0; //context query type
     public long statusFlags = 0;
     public long sequenceId = 0;
     

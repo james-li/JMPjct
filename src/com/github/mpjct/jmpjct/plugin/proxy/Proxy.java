@@ -120,15 +120,14 @@ public class Proxy extends Base {
     
     public void read_query(Engine context) throws IOException {
         this.logger.trace("read_query");
-        context.bufferResultSet = false;
         
         byte[] packet = Packet.read_packet(context.clientIn);
         context.buffer.add(packet);
         
         context.sequenceId = Packet.getSequenceId(packet);
         this.logger.trace("Client sequenceId: "+context.sequenceId);
-        
-        switch (Packet.getType(packet)) {
+        context.command = Packet.getType(packet);
+        switch (context.command) {
             case Flags.COM_QUIT:
                 this.logger.trace("COM_QUIT");
                 context.halt();
@@ -164,16 +163,19 @@ public class Proxy extends Base {
         context.buffer.add(packet);
         
         context.sequenceId = Packet.getSequenceId(packet);
-        
-        switch (Packet.getType(packet)) {
+        byte type = Packet.getType(packet);
+        this.logger.trace("read_query_result, seq " + context.sequenceId + ", type " + type);
+        switch (type) {
             case Flags.OK:
             case Flags.ERR:
                 break;
             
             default:
-                context.buffer = Packet.read_full_result_set(this.mysqlIn, context.clientOut, context.buffer, context.bufferResultSet);
+                context.buffer = Packet.read_full_result_set(this.mysqlIn, context);
+                //context.clientOut, context.buffer, context.bufferResultSet);
                 break;
         }
+        
     }
     
     public void send_query_result(Engine context) throws IOException {

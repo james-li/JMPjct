@@ -60,8 +60,8 @@ public class Debug extends Base {
     public void read_query_result(Engine context) {
         if (!context.bufferResultSet)
             return;
-        
-        switch (Packet.getType(context.buffer.get(context.buffer.size()-1))) {
+        byte packetType = Packet.getType(context.buffer.get(context.buffer.size()-1));
+        switch (packetType) {
             case Flags.OK:
                 this.logger.info("<- OK");
                 break;
@@ -71,7 +71,8 @@ public class Debug extends Base {
                 break;
             
             default:
-                this.logger.debug("Result set or Packet is "+Packet.getType(context.buffer.get(context.buffer.size()-1))+" type.");
+                this.logger.debug("Result set or Packet is "+ packetType +" type.");
+                Debug.dump_buffer(context);
                 break;
         }
     }

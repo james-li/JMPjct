@@ -8,6 +8,8 @@ import java.io.InputStream;
 import org.apache.commons.io.HexDump;
 import org.apache.log4j.Logger;
 
+import com.github.mpjct.jmpjct.Engine;
+
 public abstract class Packet {
     public long sequenceId = 0;
 
@@ -52,6 +54,8 @@ public abstract class Packet {
         
         if (!logger.isTraceEnabled())
             return;
+        if (packet.length == 0)
+        	return;
         
         try {
             ByteArrayOutputStream out = new ByteArrayOutputStream();
@@ -109,12 +113,19 @@ public abstract class Packet {
         return packet;
     }
     
-    public static ArrayList<byte[]> read_full_result_set(InputStream in, OutputStream out, ArrayList<byte[]> buffer, boolean bufferResultSet) throws IOException {
+    public static ArrayList<byte[]> read_full_result_set(InputStream in, Engine Context) throws IOException{ 
+    //OutputStream out, ArrayList<byte[]> buffer, boolean bufferResultSet) throws IOException {
         // Assume we have the start of a result set already
+        OutputStream out = Context.clientOut;
+        ArrayList<byte[]> buffer = Context.buffer;
+        boolean bufferResultSet = Context.bufferResultSet;
         
+        byte command = Context.command; 
         byte[] packet = buffer.get((buffer.size()-1));
         long colCount = ColCount.loadFromPacket(packet).colCount;
         
+        
+        	
         // Read the columns and the EOF field
         for (int i = 0; i < (colCount+1); i++) {
             packet = Packet.read_packet(in);
@@ -122,12 +133,15 @@ public abstract class Packet {
                 throw new IOException();
             }
             buffer.add(packet);
-            
+            byte packetType = Packet.getType(packet);
             // Evil optimization
             if (!bufferResultSet) {
                 Packet.write(out, buffer);
                 out.flush();
                 buffer.clear();
+            }
+            if (command == Flags.COM_FIELD_LIST && packetType == Flags.EOF) {
+            	return buffer;
             }
         }
         
@@ -145,9 +159,12 @@ public abstract class Packet {
             int packetType = Packet.getType(packet);
             
             if (packetType == Flags.EOF || packetType == Flags.ERR) {
+            	//position may be zero when the first packet with EOF
+            	if(position > 0) {
                 byte[] newPackedPacket = new byte[position];
                 System.arraycopy(packedPacket, 0, newPackedPacket, 0, position);
                 buffer.add(newPackedPacket);
+            	}
                 packedPacket = packet;
                 break;
             }
@@ -189,7 +206,7 @@ public abstract class Packet {
         
         if (EOF.loadFromPacket(packet).hasStatusFlag(Flags.SERVER_MORE_RESULTS_EXISTS)) {
             buffer.add(Packet.read_packet(in));
-            buffer = Packet.read_full_result_set(in, out, buffer, bufferResultSet);
+            buffer = Packet.read_full_result_set(in, Context);
         }
         return buffer;
     }
